@@ -4,6 +4,8 @@ ml
 a.out
 *.dSYM/
 
+tests.c
+
 # macOS
 .DS_Store
 
