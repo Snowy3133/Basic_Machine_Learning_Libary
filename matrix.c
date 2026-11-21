@@ -1,4 +1,6 @@
 
+#include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include "matrix.h"
 #include "arena.h"
@@ -6,10 +8,18 @@
 matrix* mat_create(memory_arena* arena, u32 rows, u32 cols) {
 	matrix* mat = PUSH_STRUCT(arena, matrix);
 
+	if (mat == NULL) {
+		return NULL;
+	}
+
 	mat->rows = rows;
 	mat->cols = cols;
 	
 	mat->data = PUSH_ARRAY(arena, f32, (u64)rows * cols);
+	
+	if (mat->data == NULL) {
+		return NULL;
+	}
 
 	return mat;
 
@@ -17,8 +27,8 @@ matrix* mat_create(memory_arena* arena, u32 rows, u32 cols) {
 
 matrix* mat_load(memory_arena* arena, u32 rows, u32 cols, const char* filename);
 
-b32 mat_copy(matrix* a, matrix* b) {
-	if (a->rows != b-> rows || a->cols != b->cols) {
+b32 mat_copy(matrix* dst, matrix* src) {
+	if (dst->rows != src-> rows || dst->cols != src->cols) {
 		return false;
 	}
 
@@ -34,7 +44,7 @@ void mat_clear(matrix* mat) {
 }
 
 void mat_fill(matrix* mat, f32 fill) {
-	u64 size = (u64) mat->cols * mat->row;
+	u64 size = (u64) mat->cols * mat->rows;
 
 	for (u64 i = 0; i < size; i++) {
 		mat->data[i] = fill;
@@ -45,7 +55,7 @@ void mat_fill_random(matrix* mat, f32 lower, f32 upper) {
 	u64 size = (u64) mat->cols * mat->rows;
 
 	for (u64 i = 0; i < size; i++) {
-		mat->data[i] = rand() % (upper + 1 - lower) + lower;
+		mat->data[i] = lower + (upper - lower) * ((f32)rand() / RAND_MAX);
 	}
 }
 
@@ -53,7 +63,7 @@ void mat_scale(matrix* mat, f32 scale) {
 	u64 size = (u64) mat->cols * mat->rows;
 
 	for (u64 i = 0; i < size; i++) {
-		mat->data[i] *= scale
+		mat->data[i] *= scale;
 	}
 }
 
@@ -62,7 +72,7 @@ f32 mat_sum(matrix* mat) {
 
 	f32 sum = 0.0f;
 	for (u64 i = 0; i < size; i++) {
-		sum += mat->data[i]
+		sum += mat->data[i];
 	}
 
 	return sum;
@@ -75,7 +85,7 @@ u64 mat_argmax(matrix* mat) {
 	u64 max_i = 0;
 
 	for (u64 i = 0; i < size; i++) {
-		if mat->data[i] > mat->data[max_i] {
+		if (mat->data[i] > mat->data[max_i]) {
 			max_i = i;
 		}
 	}
@@ -85,11 +95,11 @@ u64 mat_argmax(matrix* mat) {
 }
 
 b32 mat_add(matrix* out, const matrix* a, const matrix* b) {
-	if (a->rows != b->rows || a->cols != b->rows) {
+	if (a->rows != b->rows || a->cols != b->cols) {
 		return false;
 	}
 
-	if (a->rows != out->rows || a->cols != b->rows) {
+	if (a->rows != out->rows || a->cols != out->cols) {
 		return false;
 	}
 
@@ -103,11 +113,11 @@ b32 mat_add(matrix* out, const matrix* a, const matrix* b) {
 }
 
 b32 mat_sub(matrix* out, const matrix* a, const matrix* b) {
-	if (a->rows != b->rows || a->cols != b->rows) {
+	if (a->rows != b->rows || a->cols != b->cols) {
 		return false;
 	}
 
-	if (a->rows != out->rows || a->cols != b->rows) {
+	if (a->rows != out->rows || a->cols != out->cols) {
 		return false;
 	}
 
@@ -234,7 +244,7 @@ b32 mat_cross_entropy(matrix* out, const matrix* correct, const matrix* prob) {
 	u64 size = (u64) out->rows * out->cols;
 
 	for (u64 i = 0; i < size; i++) {
-		out->data[i] = correct->data[i] == 0.0f ? 0.0f : -correct->data[i] * logf(fmaxf(prob->data[i], 1e-7f));
+		out->data[i] = correct->data[i] > 0.0f ? -correct->data[i] * logf(fmaxf(prob->data[i], 1e-7f)) : 0.0f;
 	}
 
 	return true;
@@ -252,18 +262,14 @@ b32 mat_relu_add_grad(matrix* out, const matrix* in, const matrix* grad) {
 	u64 size = (u64) out->cols * out->rows;
 
 	for (u64 i = 0; i < size; i++) {
-		out->data[i] += grad->data[i] > 0.0f ? grad->data[i] : 0.0f;
+		out->data[i] +=in->data[i] > 0.0f ? grad->data[i] : 0.0f;
 	}
 
 	return true;
 
 }
 
-b32 mat_softmax_add_grad(matrix* out, const matrix* softmax_out, const matrix* grad);
-b32 mat_cross_entropy_add_grad(matrix* p_grad, matrix* q_grad, const matrix* p, const matrix* q, const matrix* grad);
-
-
-
+	
 
 
 

@@ -2,8 +2,7 @@
 #ifndef MATRIX_H
 #define MATRIX_H
 
-#include <base.h>
-
+#include "arena.h"
 
 typedef struct {
 	u32 rows, cols;

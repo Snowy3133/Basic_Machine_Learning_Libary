@@ -11,6 +11,10 @@
 memory_arena* arena_create(u64 capacity){
 	memory_arena* arena = malloc(capacity);
 
+	if (arena == NULL) {
+		return NULL;
+	}
+
 	arena -> capacity = capacity;
 	arena -> pos = ARENA_BASE_POS;
 
