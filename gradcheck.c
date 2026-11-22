@@ -1,9 +1,8 @@
 
+#include <math.h>
 #include "gradcheck.h"
 #include "matrix.h"
 #include "base.h"
-
-typedef f64 (*gc_fn)(void* ctx);
 
 f32 grad_check(matrix* x, const matrix* auto_diff_grad, gc_fn f, void* ctx, f32 h) {
 	ASSERT(x->rows == auto_diff_grad->rows && x->cols == auto_diff_grad->cols);
@@ -41,5 +40,25 @@ f32 grad_check(matrix* x, const matrix* auto_diff_grad, gc_fn f, void* ctx, f32 
 
 }
 
-f64 weighted_sum(const matrix* out, const matrix* g);
-f32 rel_error(f32 a, f32 n);
+f64 weighted_sum(const matrix* out, const matrix* g) {
+	ASSERT(out->rows == g->rows && out->cols == g->cols);
+
+	f64 sum = 0.0f;
+
+	u64 size = (u64) out->rows * out->cols;
+
+	for (u64 i = 0; i < size; i++) {
+		sum += (f64) out->data[i] * g->data[i];
+	}
+
+	return sum;
+
+}
+
+f32 rel_error(f32 a, f32 n) {
+	f32 difference = fabsf(a - n);
+	f32 relative_difference = difference / MAX(MAX(fabsf(a), fabsf(n)), 1e-6f);
+
+	return fabsf(relative_difference);
+
+}
