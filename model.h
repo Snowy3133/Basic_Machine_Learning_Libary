@@ -50,7 +50,23 @@ typedef struct {
 	model_var* cost;
 } model;
 
+static void relu_fwd(model_var* v);
+static void add_fwd(model_var* v);
+static void sub_fwd(model_var* v);
+static void matmul_fwd(model_var* v);
+static void add_bias_fwd(model_var* v);
+static void softmax_ce_fwd(model_var* v);
+
+static void relu_bwd(model_var* v);
+static void add_bwd(model_var* v);
+static void sub_bwd(model_var* v);
+static void matmul_bwd(model_var* v);
+static void add_bias_bwd(model_var* v);
+static void softmax_ce_bwd(model_var* v);
+
 model* model_create(memory_arena* arena, u32 max_vars);
+void model_forward(model* m);
+void model_backward(model* m);
 model_var* mv_create(model* m, u32 rows, u32 cols, u32 flags);
 model_var* mv_relu(model* m, model_var* mv);
 model_var* mv_add(model* m, model_var* a, model_var* b);

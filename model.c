@@ -1,8 +1,105 @@
 
+#include <math.h>
 #include "model.h"
 #include "matrix.h"
 
 typedef void (*mv_fn)(model_var* v);
+
+static void relu_fwd(model_var* v) {
+	mat_relu(v->val, v->inputs[0]->val);	
+
+}
+
+static void add_fwd(model_var* v) {
+	mat_add(v->val, v->inputs[0]->val, v->inputs[1]->val);
+
+}
+
+static void sub_fwd(model_var* v) {
+	mat_sub(v->val, v->inputs[0]->val, v->inputs[1]->val);
+
+}
+
+static void matmul_fwd(model_var* v) {
+	mat_mul(v->val, v->inputs[0]->val, v->inputs[1]->val, true, false, false);
+
+}
+
+static void add_bias_fwd(model_var* v) {
+	mat_add_bias(v->val, v->inputs[0]->val, v->inputs[1]->val);
+
+}
+
+static void softmax_ce_fwd(model_var* v) {
+	mat_softmax_ce(v->val, v->aux, v->inputs[0]->val, v->inputs[1]->val);
+
+}
+
+static void relu_bwd(model_var* v) {
+	model_var* a = v->inputs[0];
+
+	if (a->grad != NULL) {
+		mat_relu_add_grad(a->grad, a->val, v->grad);
+	}
+
+}
+
+static void add_bwd(model_var* v) {
+	model_var* a = v->inputs[0];
+	model_var* b = v->inputs[1];
+
+	if (a->grad != NULL) {
+		mat_add(a->grad, a->grad, v->grad);
+	}
+	if (b->grad != NULL) {
+		mat_add(b->grad, b->grad, v->grad);
+	}
+}
+
+static void sub_bwd(model_var* v) {
+	model_var* a = v->inputs[0];
+	model_var* b = v->inputs[1];
+
+	if (a->grad != NULL) {
+		mat_add(a->grad, a->grad, v->grad);
+	}
+	if (b->grad != NULL) {
+		mat_sub(b->grad, b->grad, v->grad);
+	}
+}
+
+static void matmul_bwd(model_var* v) {
+	model_var* a = v->inputs[0];
+	model_var* b = v->inputs[1];
+
+	if (a->grad != NULL) {
+		mat_mul(a->grad, v->grad, b->val, false, false, true);
+	}
+	if (b->grad != NULL) {
+		mat_mul(b->grad, a->val, v->grad, false, true, false);
+	}
+}
+
+static void add_bias_bwd(model_var* v) {
+	model_var* x = v->inputs[0];
+	model_var* bias = v->inputs[1];
+
+	if (x->grad != NULL) {
+		mat_add(x->grad, x->grad, v->grad);
+	}
+	if (bias->grad != NULL) {
+		mat_add_bias_grad(bias->grad, v->grad);
+	}
+}
+
+static void softmax_ce_bwd(model_var* v) {
+	model_var* logits = v->inputs[0];
+	model_var* labels = v->inputs[1];
+
+	if (logits->grad != NULL) {
+		mat_softmax_ce_grad(logits->grad, v->aux, labels->val, v->grad);
+	}
+}
 
 typedef struct {
 	const char* name;
@@ -12,13 +109,13 @@ typedef struct {
 } mv_op_info;
 
 static const mv_op_info mv_ops[MV_OP_COUNT] = {
-    [MV_OP_CREATE]     = { "create",     0, NULL,           NULL           },
-    [MV_OP_RELU]       = { "relu",       1, NULL,           NULL           },
-    [MV_OP_ADD]        = { "add",        2, NULL,           NULL           },
-    [MV_OP_SUB]        = { "sub",        2, NULL,           NULL           },
-    [MV_OP_MATMUL]     = { "matmul",     2, NULL,           NULL           },
-    [MV_OP_ADD_BIAS]   = { "add_bias",   2, NULL,           NULL           },
-    [MV_OP_SOFTMAX_CE] = { "softmax_ce", 2, NULL,           NULL           },
+    [MV_OP_CREATE]     = { "create",     0, NULL,            NULL           },
+    [MV_OP_RELU]       = { "relu",       1, relu_fwd,        relu_bwd       },
+    [MV_OP_ADD]        = { "add",        2, add_fwd,         add_bwd        },
+    [MV_OP_SUB]        = { "sub",        2, sub_fwd,         sub_bwd        },
+    [MV_OP_MATMUL]     = { "matmul",     2, matmul_fwd,      matmul_bwd     },
+    [MV_OP_ADD_BIAS]   = { "add_bias",   2, add_bias_fwd,    add_bias_bwd   },
+    [MV_OP_SOFTMAX_CE] = { "softmax_ce", 2, softmax_ce_fwd,  softmax_ce_bwd },
 };
 
 
@@ -32,6 +129,37 @@ model* model_create(memory_arena* arena, u32 max_var) {
 	mod->max_vars = max_var;
 
 	return mod;
+}
+
+void model_forward(model* m) {
+	for (u32 i = 0; i < m->num_vars; i++) {
+		model_var* v = m->vars[i];
+
+		if (v->op != MV_OP_CREATE) {
+			mv_ops[v->op].forward(v);
+		}
+	}
+}
+
+void model_backward(model* m) {
+	ASSERT(m->cost != NULL);
+
+	for (u32 i = 0; i < m->num_vars; i++) {
+		model_var* v = m->vars[i];
+		if (v->grad != NULL && !(v->flags & MV_FLAG_PARAMETER)) {
+			mat_clear(v->grad);
+		}
+	}
+
+	mat_fill(m->cost->grad, 1.0f);
+
+	for (u32 i = m->num_vars; i > 0; i--) {
+		model_var* v = m->vars[i - 1];
+
+		if (v->op != MV_OP_CREATE && v->grad != NULL) {
+			mv_ops[v->op].backward(v);
+		}
+	}
 }
 
 static model_var* mv_new(model* m, mv_op op, u32 rows, u32 cols, u32 flags, model_var* a, model_var* b) {

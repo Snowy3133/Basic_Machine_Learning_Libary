@@ -28,7 +28,6 @@ void mat_relu(matrix* out, const matrix* in);
 void mat_softmax(matrix* out, const matrix* in);
 void mat_cross_entropy(matrix* out, const matrix* p, const matrix* q);
 void mat_relu_add_grad(matrix* out, const matrix* in, const matrix* grad);
-
 void mat_add_bias(matrix* out, const matrix* x, const matrix* bias);
 void mat_add_bias_grad(matrix* bias_grad, const matrix* grad);
 void mat_softmax_rows(matrix* out, const matrix* in);
